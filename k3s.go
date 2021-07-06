@@ -1,4 +1,4 @@
-package dtest_k3s
+package dtest
 
 import (
 	"context"
