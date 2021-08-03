@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/datawire/dlib/dlog"
+	"github.com/datawire/dlib/dtime"
 	"golang.org/x/sys/windows"
 )
 
@@ -31,16 +32,18 @@ func WithNamedMachineLock(ctx context.Context, name string, body func(context.Co
 		return windows.CreateFile(uPath, windows.GENERIC_READ, 0, nil, windows.OPEN_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
 	}
 	h, err := createFile()
-	for ; err != nil; h, err = createFile() {
+	for ; err != nil && ctx.Err() == nil; h, err = createFile() {
 		if !errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
 			// If it's not a sharing violation then we have an actual, legit error
 			exit(filename, err)
 		}
-		time.Sleep(500 * time.Millisecond)
+		dtime.SleepWithContext(ctx, 500*time.Millisecond)
 	}
 
 	defer windows.CloseHandle(h)
 
 	dlog.Printf(ctx, "Acquiring machine lock %q took %.2f seconds\n", name, time.Since(lockAcquireStart).Seconds())
-	body(ctx)
+	if ctx.Err() == nil {
+		body(ctx)
+	}
 }
